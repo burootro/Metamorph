@@ -5,8 +5,8 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.burootro.metamorph.core.Feature
 import io.github.burootro.metamorph.core.Prefs
-import io.github.burootro.metamorph.features.SaveImage
 import io.github.burootro.metamorph.features.TestHook
+import io.github.burootro.metamorph.features.VideoProbe
 
 class HookEntry : IXposedHookLoadPackage {
 
@@ -25,7 +25,7 @@ class HookEntry : IXposedHookLoadPackage {
         Feature.runAll(
             listOf(
                 TestHook(cl, prefs),
-                SaveImage(cl, prefs)
+                VideoProbe(cl, prefs)
             )
         )
     }
