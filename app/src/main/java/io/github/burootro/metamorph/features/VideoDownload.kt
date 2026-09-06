@@ -106,7 +106,7 @@ class VideoDownload(
         val listener = object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val view = param.thisObject as? View ?: return
-                view.post { addButton(view) }
+                view.post { placeButton(view) }
             }
         }
 
@@ -124,19 +124,40 @@ class VideoDownload(
         log("تم تركيب الهوك")
     }
 
-    private fun addButton(surface: View) {
+    /**
+     * نصعد في شجرة الآباء حتى نجد أول حاوية تدعم التراكب،
+     * لأن فيديوهات الفيد تُرسم داخل LithoView لا FrameLayout.
+     */
+    private fun placeButton(surface: View) {
         runCatching {
 
-            val container = surface.parent as? ViewGroup ?: return
-            if (container !is FrameLayout && container.javaClass.simpleName != "RelativeLayout") {
-                // نصعد مستوى إذا لم تكن الحاوية مناسبة للتراكب
-                val upper = container.parent as? FrameLayout ?: return
-                attachButton(upper)
-                return
+            var parent = surface.parent
+            var level = 0
+
+            while (parent is ViewGroup && level < 5) {
+
+                if (canOverlay(parent)) {
+                    attachButton(parent)
+                    return
+                }
+
+                parent = parent.parent
+                level++
             }
 
-            attachButton(container)
+            log("لم يُعثر على حاوية مناسبة")
         }
+    }
+
+    /** الحاويات التي ترسم أبناءها فوق بعضها */
+    private fun canOverlay(group: ViewGroup): Boolean {
+        val n = group.javaClass.name
+        return group is FrameLayout ||
+            n.endsWith("RelativeLayout") ||
+            n.contains("LithoView") ||
+            n.contains("ComponentHost") ||
+            n.contains("VideoPlayer") ||
+            n.contains("RichVideo")
     }
 
     private fun attachButton(container: ViewGroup) {
@@ -147,13 +168,14 @@ class VideoDownload(
         val ctx = container.context
         val button = buildButton(ctx)
 
+        val margin = dp(ctx, 12)
+
         val params = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            val m = dp(ctx, 10)
-            setMargins(m, m, m, m)
+            gravity = Gravity.BOTTOM or Gravity.END
+            setMargins(margin, margin, margin, margin)
         }
 
         button.setOnClickListener { v ->
@@ -178,27 +200,32 @@ class VideoDownload(
             ).show()
         }
 
-        runCatching { container.addView(button, params) }
+        runCatching {
+            container.addView(button, params)
+            container.clipChildren = false
+        }
     }
 
     private fun buildButton(ctx: Context): TextView {
         return TextView(ctx).apply {
             text = "⤓"
-            textSize = 18f
+            textSize = 17f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
 
-            val size = dp(ctx, 34)
+            val size = dp(ctx, 36)
+            layoutParams = ViewGroup.LayoutParams(size, size)
             width = size
             height = size
 
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#CC000000"))
+                setColor(Color.parseColor("#B3000000"))
             }
 
-            elevation = dp(ctx, 6).toFloat()
+            elevation = dp(ctx, 8).toFloat()
             isClickable = true
+            alpha = 0.9f
         }
     }
 
