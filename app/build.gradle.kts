@@ -43,6 +43,9 @@ android {
             "/META-INF/{AL2.0,LGPL2.1}",
             "/META-INF/*.version"
         )
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
