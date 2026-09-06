@@ -6,9 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -25,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.burootro.metamorph.core.Prefs
 
@@ -55,7 +59,14 @@ private fun HomeScreen(prefs: SharedPreferences) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Metamorph") })
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Metamorph",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            )
         }
     ) { padding ->
         Column(
@@ -63,8 +74,8 @@ private fun HomeScreen(prefs: SharedPreferences) {
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SectionTitle("عام")
 
@@ -72,7 +83,7 @@ private fun HomeScreen(prefs: SharedPreferences) {
                 title = "اختبار الحقن",
                 subtitle = "إظهار رسالة عند فتح فيسبوك",
                 prefs = prefs,
-                key = "test_hook"
+                prefKey = "test_hook"
             )
         }
     }
@@ -82,9 +93,10 @@ private fun HomeScreen(prefs: SharedPreferences) {
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 8.dp, top = 16.dp, bottom = 4.dp)
     )
 }
 
@@ -93,31 +105,38 @@ private fun SwitchRow(
     title: String,
     subtitle: String,
     prefs: SharedPreferences,
-    key: String
+    prefKey: String
 ) {
-    var checked by remember { mutableStateOf(prefs.getBoolean(key, false)) }
+    var checked by remember { mutableStateOf(prefs.getBoolean(prefKey, false)) }
 
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Switch(
                 checked = checked,
                 onCheckedChange = {
                     checked = it
-                    prefs.edit().putBoolean(key, it).apply()
-                },
-                modifier = Modifier.align(Alignment.End)
+                    prefs.edit().putBoolean(prefKey, it).apply()
+                }
             )
         }
     }
