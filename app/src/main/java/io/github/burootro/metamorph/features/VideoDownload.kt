@@ -2,13 +2,10 @@ package io.github.burootro.metamorph.features
 
 import android.app.Activity
 import android.app.Application
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
@@ -20,6 +17,7 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import io.github.burootro.metamorph.core.BackgroundAudio
 import io.github.burootro.metamorph.core.Downloader
 import io.github.burootro.metamorph.core.Feature
 import java.lang.ref.WeakReference
@@ -166,13 +164,14 @@ class VideoDownload(
                 val listen = buildButton(ctx, "♪", "#E62E7D5B")
                 listen.setOnClickListener { onListen(it.context) }
 
-                val gap = dp(ctx, 10)
-
                 bar.addView(download)
-                bar.addView(listen, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = gap })
+                bar.addView(
+                    listen,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = dp(ctx, 10) }
+                )
 
                 val params = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -205,7 +204,7 @@ class VideoDownload(
         )
     }
 
-    /** يشغّل الصوت في خدمة تابعة لتطبيق الموديول */
+    /** التشغيل داخل عملية فيسبوك — لا قيود على الخدمات هنا */
     private fun onListen(ctx: Context) {
 
         val url = Registry.url
@@ -215,27 +214,7 @@ class VideoDownload(
             return
         }
 
-        runCatching {
-
-            val intent = Intent().apply {
-                component = ComponentName(MODULE_PKG, SERVICE_CLASS)
-                action = ACTION_PLAY
-                putExtra("url", url)
-                putExtra("title", "فيديو فيسبوك")
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ctx.startForegroundService(intent)
-            } else {
-                ctx.startService(intent)
-            }
-
-            Toast.makeText(ctx, "التشغيل في الخلفية…", Toast.LENGTH_SHORT).show()
-
-        }.onFailure {
-            log("فشل بدء الخدمة: ${it.message}")
-            Toast.makeText(ctx, "تعذّر التشغيل", Toast.LENGTH_SHORT).show()
-        }
+        BackgroundAudio.play(ctx, url, "فيديو فيسبوك")
     }
 
     private fun buildButton(ctx: Context, label: String, color: String): TextView {
@@ -270,8 +249,5 @@ class VideoDownload(
 
     companion object {
         private const val TAG = "metamorph_bar"
-        private const val MODULE_PKG = "io.github.burootro.metamorph"
-        private const val SERVICE_CLASS = "$MODULE_PKG.core.AudioService"
-        private const val ACTION_PLAY = "$MODULE_PKG.PLAY"
     }
 }
