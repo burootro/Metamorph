@@ -1,10 +1,16 @@
 package io.github.burootro.metamorph.features
 
+import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.view.Gravity
 import android.view.SurfaceView
 import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XSharedPreferences
@@ -50,7 +56,6 @@ class VideoDownload(
         }
     }
 
-    /** نبحث بالنوع لا بالاسم — أسماء الحقول تتغيّر كل تحديث */
     private fun capture(params: Any?) {
         if (params == null) return
 
@@ -76,11 +81,10 @@ class VideoDownload(
 
             Registry.url = uri.toString()
             Registry.videoId = videoId
-            log("تم التقاط الفيديو ${videoId ?: ""}")
+            log("✓ التقاط ${videoId ?: "?"}")
         }
     }
 
-    /** يعيد أول Uri يشير إلى ملف فيديو */
     private fun findUri(source: Any): Uri? {
         source.javaClass.declaredFields.forEach { field ->
             if (Modifier.isStatic(field.modifiers)) return@forEach
@@ -95,14 +99,14 @@ class VideoDownload(
         return null
     }
 
-    // ---------- 2) الضغط المطوّل على الفيديو ----------
+    // ---------- 2) زر التنزيل العائم ----------
 
     private fun hookVideoViews() {
 
         val listener = object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val view = param.thisObject as? View ?: return
-                attachToParent(view)
+                view.post { addButton(view) }
             }
         }
 
@@ -117,42 +121,89 @@ class VideoDownload(
             )
         }
 
-        log("تم تركيب الهوك على مشغّل الفيديو")
+        log("تم تركيب الهوك")
     }
 
-    /** نركّب المستمع على الحاوية لا على السطح نفسه */
-    private fun attachToParent(view: View) {
+    private fun addButton(surface: View) {
         runCatching {
-            val target: View = (view.parent as? ViewGroup) ?: view
-            if (target.getTag(TAG_ID) == true) return
-            target.setTag(TAG_ID, true)
 
-            target.setOnLongClickListener { v ->
-                val url = Registry.url
-
-                if (url.isNullOrBlank()) {
-                    Toast.makeText(v.context, "لم يتم التقاط الفيديو بعد", Toast.LENGTH_SHORT)
-                        .show()
-                    return@setOnLongClickListener true
-                }
-
-                val ok = Downloader.download(
-                    ctx = v.context,
-                    url = url,
-                    fileName = Downloader.videoFileName(Registry.videoId),
-                    title = "فيديو فيسبوك"
-                )
-
-                Toast.makeText(
-                    v.context,
-                    if (ok) "جارٍ التنزيل…" else "فشل التنزيل",
-                    Toast.LENGTH_SHORT
-                ).show()
-
-                true
+            val container = surface.parent as? ViewGroup ?: return
+            if (container !is FrameLayout && container.javaClass.simpleName != "RelativeLayout") {
+                // نصعد مستوى إذا لم تكن الحاوية مناسبة للتراكب
+                val upper = container.parent as? FrameLayout ?: return
+                attachButton(upper)
+                return
             }
+
+            attachButton(container)
         }
     }
+
+    private fun attachButton(container: ViewGroup) {
+
+        if (container.getTag(TAG_ID) == true) return
+        container.setTag(TAG_ID, true)
+
+        val ctx = container.context
+        val button = buildButton(ctx)
+
+        val params = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            val m = dp(ctx, 10)
+            setMargins(m, m, m, m)
+        }
+
+        button.setOnClickListener { v ->
+            val url = Registry.url
+
+            if (url.isNullOrBlank()) {
+                Toast.makeText(v.context, "شغّل الفيديو أولًا", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val ok = Downloader.download(
+                ctx = v.context,
+                url = url,
+                fileName = Downloader.videoFileName(Registry.videoId),
+                title = "فيديو فيسبوك"
+            )
+
+            Toast.makeText(
+                v.context,
+                if (ok) "جارٍ التنزيل…" else "فشل التنزيل",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        runCatching { container.addView(button, params) }
+    }
+
+    private fun buildButton(ctx: Context): TextView {
+        return TextView(ctx).apply {
+            text = "⤓"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+
+            val size = dp(ctx, 34)
+            width = size
+            height = size
+
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#CC000000"))
+            }
+
+            elevation = dp(ctx, 6).toFloat()
+            isClickable = true
+        }
+    }
+
+    private fun dp(ctx: Context, value: Int): Int =
+        (value * ctx.resources.displayMetrics.density).toInt()
 
     private object Registry {
         @Volatile var url: String? = null
