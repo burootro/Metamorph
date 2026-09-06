@@ -14,11 +14,30 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+
+        // نبني نسخة واحدة تدعم كل المعماريات
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        create("auto") {
+            // مفتاح التصحيح الافتراضي — يكفي للاستخدام الشخصي
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = signingConfigs.getByName("auto")
         }
         debug {
             isMinifyEnabled = false
@@ -41,7 +60,10 @@ android {
     packaging {
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
-            "/META-INF/*.version"
+            "/META-INF/*.version",
+            "/META-INF/**.kotlin_module",
+            "DebugProbesKt.bin",
+            "kotlin-tooling-metadata.json"
         )
     }
 }
@@ -55,5 +77,4 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
 }
