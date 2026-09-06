@@ -5,6 +5,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.burootro.metamorph.core.Feature
 import io.github.burootro.metamorph.core.Prefs
+import io.github.burootro.metamorph.features.CopyPostText
 import io.github.burootro.metamorph.features.TestHook
 
 class HookEntry : IXposedHookLoadPackage {
@@ -23,8 +24,8 @@ class HookEntry : IXposedHookLoadPackage {
 
         Feature.runAll(
             listOf(
-                TestHook(cl, prefs)
-                // كل ميزة جديدة تُضاف هنا
+                TestHook(cl, prefs),
+                CopyPostText(cl, prefs)
             )
         )
     }
