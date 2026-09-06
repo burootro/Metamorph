@@ -86,13 +86,11 @@ private fun HomeScreen(prefs: SharedPreferences) {
                 prefKey = "video_download"
             )
 
-            SectionTitle("تشخيص")
-
             SwitchRow(
-                title = "فحص الصوت",
-                subtitle = "يسجّل ما يوقف الصوت عند الخروج",
+                title = "التشغيل في الخلفية",
+                subtitle = "قيد التطوير — يسجّل بيانات المحرّك",
                 prefs = prefs,
-                prefKey = "audio_probe"
+                prefKey = "background_play"
             )
         }
     }
