@@ -142,7 +142,8 @@ class VideoDownload(
         activity.runOnUiThread {
             runCatching {
 
-                val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return@runCatching
+                val root = activity.findViewById<ViewGroup>(android.R.id.content)
+                    ?: return@runCatching
 
                 // إن كان الزر موجودًا بالفعل نكتفي بإظهاره
                 val existing = root.findViewWithTag<TextView>(TAG)
@@ -180,18 +181,12 @@ class VideoDownload(
             return
         }
 
-        val ok = Downloader.download(
+        Downloader.download(
             ctx = ctx,
             url = url,
             fileName = Downloader.videoFileName(Registry.videoId),
             title = "فيديو فيسبوك"
         )
-
-        Toast.makeText(
-            ctx,
-            if (ok) "جارٍ التنزيل…" else "فشل التنزيل",
-            Toast.LENGTH_SHORT
-        ).show()
     }
 
     private fun buildButton(ctx: Context): TextView {
