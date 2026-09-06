@@ -85,6 +85,15 @@ private fun HomeScreen(prefs: SharedPreferences) {
                 prefs = prefs,
                 prefKey = "test_hook"
             )
+
+            SectionTitle("أدوات")
+
+            SwitchRow(
+                title = "نسخ نص المنشور",
+                subtitle = "اضغط مطوّلًا على أي منشور لنسخ نصه",
+                prefs = prefs,
+                prefKey = "copy_post_text"
+            )
         }
     }
 }
