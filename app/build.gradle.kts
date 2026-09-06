@@ -43,16 +43,11 @@ android {
             "/META-INF/{AL2.0,LGPL2.1}",
             "/META-INF/*.version"
         )
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 }
 
 dependencies {
     compileOnly("de.robv.android.xposed:api:82")
-
-    implementation("org.luckypray:dexkit:2.0.6")
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")
