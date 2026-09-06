@@ -1,5 +1,6 @@
 package io.github.burootro.metamorph.features
 
+import android.net.Uri
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
@@ -8,9 +9,8 @@ import io.github.burootro.metamorph.core.Feature
 import java.lang.reflect.Modifier
 
 /**
- * مرحلة استكشاف فقط — لا تحمّل شيئًا.
- * تبحث عن كائن معاملات الفيديو وتسجّل حقوله في السجل
- * حتى نعرف أين يخزّن فيسبوك رابط الفيديو.
+ * مرحلة استكشاف — تبحث عن رابط الفيديو داخل كائن المعاملات
+ * وتنزل مستوى واحد داخل الحقول الكائنية.
  */
 class VideoProbe(
     classLoader: ClassLoader,
@@ -20,34 +20,23 @@ class VideoProbe(
     override val name = "VideoProbe"
     override val key = "video_probe"
 
+    private var dumped = false
+
     override fun doHook() {
 
-        val target = XposedHelpers.findClassIfExists(
-            "com.facebook.video.common.playerorigin.PlayerOrigin",
-            classLoader
-        )
-
-        if (target == null) {
-            log("PlayerOrigin غير موجود — سنعتمد على VideoPlayerParams")
-        }
-
-        // الكلاس الأساسي لمعاملات المشغّل — اسمه غير مشفّر عادةً
         val paramsClass = XposedHelpers.findClassIfExists(
             "com.facebook.video.engine.api.VideoPlayerParams",
             classLoader
         ) ?: run {
-            log("VideoPlayerParams غير موجود — جرّب المسار البديل")
+            log("VideoPlayerParams غير موجود")
             return
         }
 
-        log("تم العثور على VideoPlayerParams")
-
-        // نلتقط أي إنشاء لهذا الكائن
         paramsClass.declaredConstructors.forEach { ctor ->
             runCatching {
                 XposedBridge.hookMethod(ctor, object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        dumpFields(param.thisObject)
+                        dump(param.thisObject)
                     }
                 })
             }
@@ -56,14 +45,17 @@ class VideoProbe(
         log("تم تركيب ${paramsClass.declaredConstructors.size} هوك")
     }
 
-    private var dumped = false
-
-    /** يطبع حقول الكائن مرة واحدة فقط لتفادي إغراق السجل */
-    private fun dumpFields(obj: Any?) {
+    private fun dump(obj: Any?) {
         if (obj == null || dumped) return
         dumped = true
 
-        log("---- حقول ${obj.javaClass.name} ----")
+        log("==== بداية الفحص ====")
+        scan(obj, depth = 0, path = "root")
+        log("==== نهاية الفحص ====")
+    }
+
+    /** يمر على الحقول وينزل مستوى واحد داخل الكائنات */
+    private fun scan(obj: Any, depth: Int, path: String) {
 
         obj.javaClass.declaredFields.forEach { field ->
             if (Modifier.isStatic(field.modifiers)) return@forEach
@@ -71,14 +63,42 @@ class VideoProbe(
             runCatching {
                 field.isAccessible = true
                 val value = field.get(obj) ?: return@runCatching
-                val text = value.toString()
 
-                if (text.length in 1..300) {
-                    log("${field.name} (${field.type.simpleName}) = $text")
+                val here = "$path.${field.name}"
+
+                when {
+                    // ما نبحث عنه بالضبط
+                    value is Uri -> log("★ URI $here = $value")
+
+                    value is String && value.contains("http") ->
+                        log("★ رابط $here = ${value.take(600)}")
+
+                    value is String && value.length in 1..120 ->
+                        log("$here = $value")
+
+                    // ننزل مستوى واحد داخل الكائنات غير البدائية
+                    depth < 2 && isWorthScanning(value) -> {
+                        log("↓ دخول $here (${value.javaClass.simpleName})")
+                        scan(value, depth + 1, here)
+                    }
                 }
             }
         }
+    }
 
-        log("---- انتهى ----")
+    private fun isWorthScanning(value: Any): Boolean {
+        val cls = value.javaClass
+        if (cls.isPrimitive || cls.isArray) return false
+
+        val n = cls.name
+        return !n.startsWith("java.") &&
+                !n.startsWith("kotlin.") &&
+                !n.startsWith("android.os.") &&
+                value !is Number &&
+                value !is Boolean &&
+                value !is CharSequence &&
+                value !is Enum<*> &&
+                value !is Collection<*> &&
+                value !is Map<*, *>
     }
 }
