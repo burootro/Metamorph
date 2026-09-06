@@ -89,10 +89,10 @@ private fun HomeScreen(prefs: SharedPreferences) {
             SectionTitle("الوسائط")
 
             SwitchRow(
-                title = "حفظ الصور",
-                subtitle = "اضغط مطوّلًا على أي صورة لحفظها في المعرض",
+                title = "استكشاف الفيديو",
+                subtitle = "وضع تشخيص — يسجّل بيانات الفيديو في سجل LSPosed",
                 prefs = prefs,
-                prefKey = "save_image"
+                prefKey = "video_probe"
             )
         }
     }
