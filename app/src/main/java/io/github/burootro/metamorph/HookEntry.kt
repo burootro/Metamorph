@@ -5,8 +5,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.burootro.metamorph.core.Feature
 import io.github.burootro.metamorph.core.Prefs
-import io.github.burootro.metamorph.features.MenuProbe
-import io.github.burootro.metamorph.features.TestHook
+import io.github.burootro.metamorph.features.BackgroundProbe
 import io.github.burootro.metamorph.features.VideoDownload
 
 class HookEntry : IXposedHookLoadPackage {
@@ -25,9 +24,8 @@ class HookEntry : IXposedHookLoadPackage {
 
         Feature.runAll(
             listOf(
-                TestHook(cl, prefs),
                 VideoDownload(cl, prefs),
-                MenuProbe(cl, prefs)
+                BackgroundProbe(cl, prefs)
             )
         )
     }
