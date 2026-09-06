@@ -2,14 +2,18 @@ package io.github.burootro.metamorph.features
 
 import android.app.Activity
 import android.app.Application
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import de.robv.android.xposed.XC_MethodHook
@@ -82,9 +86,8 @@ class VideoDownload(
 
             Registry.url = uri.toString()
             Registry.videoId = videoId
-            Registry.time = System.currentTimeMillis()
 
-            showButton()
+            showButtons()
         }
     }
 
@@ -120,7 +123,6 @@ class VideoDownload(
     }
 
     private object Tracker : Application.ActivityLifecycleCallbacks {
-
         override fun onActivityResumed(activity: Activity) {
             Registry.activity = WeakReference(activity)
         }
@@ -133,9 +135,9 @@ class VideoDownload(
         override fun onActivityDestroyed(activity: Activity) {}
     }
 
-    // ---------- 3) الزر العائم ----------
+    // ---------- 3) الأزرار العائمة ----------
 
-    private fun showButton() {
+    private fun showButtons() {
 
         val activity = Registry.activity?.get() ?: return
 
@@ -145,16 +147,32 @@ class VideoDownload(
                 val root = activity.findViewById<ViewGroup>(android.R.id.content)
                     ?: return@runCatching
 
-                // إن كان الزر موجودًا بالفعل نكتفي بإظهاره
-                val existing = root.findViewWithTag<TextView>(TAG)
+                val existing = root.findViewWithTag<LinearLayout>(TAG)
                 if (existing != null) {
                     existing.visibility = android.view.View.VISIBLE
                     return@runCatching
                 }
 
                 val ctx = activity
-                val button = buildButton(ctx)
-                button.tag = TAG
+
+                val bar = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    tag = TAG
+                }
+
+                val download = buildButton(ctx, "⤓", "#E65B4A9E")
+                download.setOnClickListener { onDownload(it.context) }
+
+                val listen = buildButton(ctx, "♪", "#E62E7D5B")
+                listen.setOnClickListener { onListen(it.context) }
+
+                val gap = dp(ctx, 10)
+
+                bar.addView(download)
+                bar.addView(listen, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = gap })
 
                 val params = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -165,14 +183,12 @@ class VideoDownload(
                     bottomMargin = dp(ctx, 100)
                 }
 
-                button.setOnClickListener { v -> onClick(v.context) }
-
-                root.addView(button, params)
+                root.addView(bar, params)
             }
         }
     }
 
-    private fun onClick(ctx: Context) {
+    private fun onDownload(ctx: Context) {
 
         val url = Registry.url
 
@@ -189,9 +205,42 @@ class VideoDownload(
         )
     }
 
-    private fun buildButton(ctx: Context): TextView {
+    /** يشغّل الصوت في خدمة تابعة لتطبيق الموديول */
+    private fun onListen(ctx: Context) {
+
+        val url = Registry.url
+
+        if (url.isNullOrBlank()) {
+            Toast.makeText(ctx, "لا يوجد فيديو", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        runCatching {
+
+            val intent = Intent().apply {
+                component = ComponentName(MODULE_PKG, SERVICE_CLASS)
+                action = ACTION_PLAY
+                putExtra("url", url)
+                putExtra("title", "فيديو فيسبوك")
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.startForegroundService(intent)
+            } else {
+                ctx.startService(intent)
+            }
+
+            Toast.makeText(ctx, "التشغيل في الخلفية…", Toast.LENGTH_SHORT).show()
+
+        }.onFailure {
+            log("فشل بدء الخدمة: ${it.message}")
+            Toast.makeText(ctx, "تعذّر التشغيل", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun buildButton(ctx: Context, label: String, color: String): TextView {
         return TextView(ctx).apply {
-            text = "⤓"
+            text = label
             textSize = 20f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -202,7 +251,7 @@ class VideoDownload(
 
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#E65B4A9E"))
+                setColor(Color.parseColor(color))
             }
 
             elevation = dp(ctx, 10).toFloat()
@@ -216,11 +265,13 @@ class VideoDownload(
     private object Registry {
         @Volatile var url: String? = null
         @Volatile var videoId: String? = null
-        @Volatile var time: Long = 0
         @Volatile var activity: WeakReference<Activity>? = null
     }
 
     companion object {
-        private const val TAG = "metamorph_dl"
+        private const val TAG = "metamorph_bar"
+        private const val MODULE_PKG = "io.github.burootro.metamorph"
+        private const val SERVICE_CLASS = "$MODULE_PKG.core.AudioService"
+        private const val ACTION_PLAY = "$MODULE_PKG.PLAY"
     }
 }
