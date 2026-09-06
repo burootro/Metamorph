@@ -77,15 +77,6 @@ private fun HomeScreen(prefs: SharedPreferences) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SectionTitle("عام")
-
-            SwitchRow(
-                title = "اختبار الحقن",
-                subtitle = "إظهار رسالة عند فتح فيسبوك",
-                prefs = prefs,
-                prefKey = "test_hook"
-            )
-
             SectionTitle("الوسائط")
 
             SwitchRow(
@@ -98,10 +89,10 @@ private fun HomeScreen(prefs: SharedPreferences) {
             SectionTitle("تشخيص")
 
             SwitchRow(
-                title = "فحص القوائم",
-                subtitle = "يسجّل بنية قائمة المشاركة في سجل LSPosed",
+                title = "فحص التشغيل بالخلفية",
+                subtitle = "يسجّل ما يحدث عند الخروج من التطبيق",
                 prefs = prefs,
-                prefKey = "menu_probe"
+                prefKey = "background_probe"
             )
         }
     }
