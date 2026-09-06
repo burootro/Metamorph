@@ -1,13 +1,13 @@
 package io.github.burootro.metamorph.features
 
+import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Bundle
 import android.view.Gravity
-import android.view.SurfaceView
-import android.view.TextureView
-import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -18,6 +18,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import io.github.burootro.metamorph.core.Downloader
 import io.github.burootro.metamorph.core.Feature
+import java.lang.ref.WeakReference
 import java.lang.reflect.Modifier
 
 class VideoDownload(
@@ -30,10 +31,10 @@ class VideoDownload(
 
     override fun doHook() {
         hookParams()
-        hookVideoViews()
+        hookActivities()
     }
 
-    // ---------- 1) التقاط الرابط ----------
+    // ---------- 1) التقاط رابط الفيديو ----------
 
     private fun hookParams() {
 
@@ -81,7 +82,9 @@ class VideoDownload(
 
             Registry.url = uri.toString()
             Registry.videoId = videoId
-            log("✓ التقاط ${videoId ?: "?"}")
+            Registry.time = System.currentTimeMillis()
+
+            showButton()
         }
     }
 
@@ -99,133 +102,116 @@ class VideoDownload(
         return null
     }
 
-    // ---------- 2) زر التنزيل العائم ----------
+    // ---------- 2) تتبّع الشاشة الحالية ----------
 
-    private fun hookVideoViews() {
+    private fun hookActivities() {
 
-        val listener = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val view = param.thisObject as? View ?: return
-                view.post { placeButton(view) }
+        XposedHelpers.findAndHookMethod(
+            Application::class.java, "onCreate",
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val app = param.thisObject as? Application ?: return
+                    app.registerActivityLifecycleCallbacks(Tracker)
+                }
             }
-        }
-
-        runCatching {
-            XposedHelpers.findAndHookMethod(
-                TextureView::class.java, "onAttachedToWindow", listener
-            )
-        }
-        runCatching {
-            XposedHelpers.findAndHookMethod(
-                SurfaceView::class.java, "onAttachedToWindow", listener
-            )
-        }
+        )
 
         log("تم تركيب الهوك")
     }
 
-    /**
-     * نصعد في شجرة الآباء حتى نجد أول حاوية تدعم التراكب،
-     * لأن فيديوهات الفيد تُرسم داخل LithoView لا FrameLayout.
-     */
-    private fun placeButton(surface: View) {
-        runCatching {
+    private object Tracker : Application.ActivityLifecycleCallbacks {
 
-            var parent = surface.parent
-            var level = 0
+        override fun onActivityResumed(activity: Activity) {
+            Registry.activity = WeakReference(activity)
+        }
 
-            while (parent is ViewGroup && level < 5) {
+        override fun onActivityPaused(activity: Activity) {}
+        override fun onActivityCreated(a: Activity, b: Bundle?) {}
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
+    }
 
-                if (canOverlay(parent)) {
-                    attachButton(parent)
-                    return
+    // ---------- 3) الزر العائم ----------
+
+    private fun showButton() {
+
+        val activity = Registry.activity?.get() ?: return
+
+        activity.runOnUiThread {
+            runCatching {
+
+                val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return@runCatching
+
+                // إن كان الزر موجودًا بالفعل نكتفي بإظهاره
+                val existing = root.findViewWithTag<TextView>(TAG)
+                if (existing != null) {
+                    existing.visibility = android.view.View.VISIBLE
+                    return@runCatching
                 }
 
-                parent = parent.parent
-                level++
-            }
+                val ctx = activity
+                val button = buildButton(ctx)
+                button.tag = TAG
 
-            log("لم يُعثر على حاوية مناسبة")
+                val params = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.BOTTOM or Gravity.END
+                    rightMargin = dp(ctx, 16)
+                    bottomMargin = dp(ctx, 100)
+                }
+
+                button.setOnClickListener { v -> onClick(v.context) }
+
+                root.addView(button, params)
+            }
         }
     }
 
-    /** الحاويات التي ترسم أبناءها فوق بعضها */
-    private fun canOverlay(group: ViewGroup): Boolean {
-        val n = group.javaClass.name
-        return group is FrameLayout ||
-            n.endsWith("RelativeLayout") ||
-            n.contains("LithoView") ||
-            n.contains("ComponentHost") ||
-            n.contains("VideoPlayer") ||
-            n.contains("RichVideo")
-    }
+    private fun onClick(ctx: Context) {
 
-    private fun attachButton(container: ViewGroup) {
+        val url = Registry.url
 
-        if (container.getTag(TAG_ID) == true) return
-        container.setTag(TAG_ID, true)
-
-        val ctx = container.context
-        val button = buildButton(ctx)
-
-        val margin = dp(ctx, 12)
-
-        val params = FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.BOTTOM or Gravity.END
-            setMargins(margin, margin, margin, margin)
+        if (url.isNullOrBlank()) {
+            Toast.makeText(ctx, "لا يوجد فيديو", Toast.LENGTH_SHORT).show()
+            return
         }
 
-        button.setOnClickListener { v ->
-            val url = Registry.url
+        val ok = Downloader.download(
+            ctx = ctx,
+            url = url,
+            fileName = Downloader.videoFileName(Registry.videoId),
+            title = "فيديو فيسبوك"
+        )
 
-            if (url.isNullOrBlank()) {
-                Toast.makeText(v.context, "شغّل الفيديو أولًا", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val ok = Downloader.download(
-                ctx = v.context,
-                url = url,
-                fileName = Downloader.videoFileName(Registry.videoId),
-                title = "فيديو فيسبوك"
-            )
-
-            Toast.makeText(
-                v.context,
-                if (ok) "جارٍ التنزيل…" else "فشل التنزيل",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        runCatching {
-            container.addView(button, params)
-            container.clipChildren = false
-        }
+        Toast.makeText(
+            ctx,
+            if (ok) "جارٍ التنزيل…" else "فشل التنزيل",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun buildButton(ctx: Context): TextView {
         return TextView(ctx).apply {
             text = "⤓"
-            textSize = 17f
+            textSize = 20f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
 
-            val size = dp(ctx, 36)
-            layoutParams = ViewGroup.LayoutParams(size, size)
+            val size = dp(ctx, 46)
             width = size
             height = size
 
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#B3000000"))
+                setColor(Color.parseColor("#E65B4A9E"))
             }
 
-            elevation = dp(ctx, 8).toFloat()
+            elevation = dp(ctx, 10).toFloat()
             isClickable = true
-            alpha = 0.9f
         }
     }
 
@@ -235,9 +221,11 @@ class VideoDownload(
     private object Registry {
         @Volatile var url: String? = null
         @Volatile var videoId: String? = null
+        @Volatile var time: Long = 0
+        @Volatile var activity: WeakReference<Activity>? = null
     }
 
     companion object {
-        private const val TAG_ID = 0x7F5A0003
+        private const val TAG = "metamorph_dl"
     }
 }
