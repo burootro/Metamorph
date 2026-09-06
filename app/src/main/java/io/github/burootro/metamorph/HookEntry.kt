@@ -5,7 +5,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import io.github.burootro.metamorph.core.Feature
 import io.github.burootro.metamorph.core.Prefs
-import io.github.burootro.metamorph.features.BackgroundPlay
+import io.github.burootro.metamorph.features.AudioProbe
 import io.github.burootro.metamorph.features.VideoDownload
 
 class HookEntry : IXposedHookLoadPackage {
@@ -25,7 +25,7 @@ class HookEntry : IXposedHookLoadPackage {
         Feature.runAll(
             listOf(
                 VideoDownload(cl, prefs),
-                BackgroundPlay(cl, prefs)
+                AudioProbe(cl, prefs)
             )
         )
     }
