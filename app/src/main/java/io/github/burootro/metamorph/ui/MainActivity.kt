@@ -89,10 +89,10 @@ private fun HomeScreen(prefs: SharedPreferences) {
             SectionTitle("الوسائط")
 
             SwitchRow(
-                title = "استكشاف الفيديو",
-                subtitle = "وضع تشخيص — يسجّل بيانات الفيديو في سجل LSPosed",
+                title = "تنزيل الفيديوهات",
+                subtitle = "اضغط مطوّلًا على الفيديو أثناء تشغيله لتنزيله",
                 prefs = prefs,
-                prefKey = "video_probe"
+                prefKey = "video_download"
             )
         }
     }
